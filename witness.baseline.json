@@ -1,0 +1,7 @@
+[
+  {
+    "mutation": "< → <=",
+    "snippet": "const d = dot < 0 ? 0 : L.unitPrice.length - dot - 1;",
+    "reason": "guard-shadowed identity: dot === 0 would need a unitPrice starting with a dot, which the ^[0-9]+ regex has already refused — the boundary is unreachable and no input separates < from <=."
+  }
+]

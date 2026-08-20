@@ -1,0 +1,1210 @@
+[
+ {
+  "fn": "tierOf",
+  "teaches": "tier computed from run evidence",
+  "description": "tierOf(record). record must be a plain object (not null, not an array) containing a field `runs` that is an array (empty allowed). Every element of `runs` must be a plain object with: `workflow` a non-empty string, `conclusion` exactly the string 'success' or exactly 'failure' (any other value is invalid), and `mutation` a strict boolean. Extra fields on the record or on any run element are IGNORED — in particular a `tier` field on the record is a self-claim and is ignored, never rejected. A run is ADMISSIBLE if and only if its workflow is NOT exactly the string 'pages build and deployment' (case-sensitive, exact match; any other workflow name, including near-misses like 'Pages build and deployment', is admissible). Compute tier over admissible runs only: tier is 'Proven' if at least one admissible run has conclusion==='success' AND mutation===true; otherwise 'Works' if at least one admissible run has conclusion==='success'; otherwise 'Prototype'. evidence is the integer count of admissible runs with conclusion==='success', counted regardless of their mutation flag. Success shape: {ok:true, tier:'Proven'|'Works'|'Prototype', evidence:<integer>}. An empty runs array is valid and returns {ok:true, tier:'Prototype', evidence:0}. Return EXACTLY {ok:false} (no other fields) when: record is not a plain object, `runs` is missing or not an array, any run element is not a plain object, any workflow is missing, not a string, or is the empty string, any conclusion is not exactly 'success' or 'failure', or any mutation is not a strict boolean.",
+  "inputs": [
+   "record: {runs: Array<{workflow:string, conclusion:'success'|'failure', mutation:boolean}>, tier?: any (ignored)}"
+  ],
+  "verify": [
+   {
+    "in": [
+     {
+      "runs": [
+       {
+        "workflow": "ci",
+        "conclusion": "success",
+        "mutation": true
+       }
+      ]
+     }
+    ],
+    "out": {
+     "ok": true,
+     "tier": "Proven",
+     "evidence": 1
+    }
+   },
+   {
+    "in": [
+     {
+      "runs": [
+       {
+        "workflow": "pages build and deployment",
+        "conclusion": "success",
+        "mutation": false
+       },
+       {
+        "workflow": "ci",
+        "conclusion": "success",
+        "mutation": false
+       }
+      ],
+      "tier": "Proven"
+     }
+    ],
+    "out": {
+     "ok": true,
+     "tier": "Works",
+     "evidence": 1
+    }
+   },
+   {
+    "in": [
+     {
+      "runs": [
+       {
+        "workflow": "pages build and deployment",
+        "conclusion": "success",
+        "mutation": true
+       }
+      ]
+     }
+    ],
+    "out": {
+     "ok": true,
+     "tier": "Prototype",
+     "evidence": 0
+    }
+   },
+   {
+    "in": [
+     {
+      "runs": []
+     }
+    ],
+    "out": {
+     "ok": true,
+     "tier": "Prototype",
+     "evidence": 0
+    }
+   },
+   {
+    "in": [
+     {
+      "runs": "none"
+     }
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     {
+      "runs": [
+       {
+        "workflow": "ci",
+        "conclusion": "passed",
+        "mutation": false
+       }
+      ]
+     }
+    ],
+    "out": {
+     "ok": false
+    }
+   }
+  ],
+  "groundedIn": "the-ladder.md: 'There is no setter' — tierOf reads what GitHub's runners actually did; a `tier` field on the input is ignored, not rejected (which is stronger); and 'THE PAGES DEPLOY IS NOT A TEST' — counting the Pages deploy as evidence would have handed 36 repos a tier they never earned, so it is excluded by name with a test asserting a Pages-only repo stays Prototype."
+ },
+ {
+  "fn": "conformanceOf",
+  "teaches": "badge earned by verification results",
+  "description": "conformanceOf(checks). checks must be a plain object (not null, not an array) with exactly-typed strict-boolean fields sigPresent, sigValid, anchorPresent, anchorValid, attPresent, attValid — all six required; extra fields are ignored. Consistency rule: for each of the three pairs, Valid===true while its Present===false is a contradiction (a verification cannot succeed on an absent artifact) and returns EXACTLY {ok:false}. Presence buys NOTHING toward the level — only Valid flags count. level is the length of the unbroken chain of valid layers in the fixed order signature -> anchor -> attestation: level is 0 if sigValid===false; 1 if sigValid===true and anchorValid===false; 2 if sigValid===true and anchorValid===true and attValid===false; 3 if all three Valid flags are true. A valid later layer above a broken earlier layer does NOT raise the level (e.g. attValid true with anchorValid false yields level 1). attestation status is computed ONLY from the attestation pair, independent of level, with three states: 'attested' if attValid===true; 'present-but-invalid' if attPresent===true and attValid===false; 'none' if attPresent===false. Success shape: {ok:true, level:<integer 0..3>, attestation:'attested'|'present-but-invalid'|'none'}. Return EXACTLY {ok:false} (no other fields) when: checks is not a plain object, any of the six fields is missing or is not a strict boolean (truthy strings, numbers, null do not count), or any Valid/Present contradiction exists.",
+  "inputs": [
+   "checks: {sigPresent:boolean, sigValid:boolean, anchorPresent:boolean, anchorValid:boolean, attPresent:boolean, attValid:boolean}"
+  ],
+  "verify": [
+   {
+    "in": [
+     {
+      "sigPresent": true,
+      "sigValid": true,
+      "anchorPresent": true,
+      "anchorValid": true,
+      "attPresent": true,
+      "attValid": true
+     }
+    ],
+    "out": {
+     "ok": true,
+     "level": 3,
+     "attestation": "attested"
+    }
+   },
+   {
+    "in": [
+     {
+      "sigPresent": true,
+      "sigValid": true,
+      "anchorPresent": false,
+      "anchorValid": false,
+      "attPresent": true,
+      "attValid": false
+     }
+    ],
+    "out": {
+     "ok": true,
+     "level": 1,
+     "attestation": "present-but-invalid"
+    }
+   },
+   {
+    "in": [
+     {
+      "sigPresent": true,
+      "sigValid": true,
+      "anchorPresent": true,
+      "anchorValid": false,
+      "attPresent": true,
+      "attValid": true
+     }
+    ],
+    "out": {
+     "ok": true,
+     "level": 1,
+     "attestation": "attested"
+    }
+   },
+   {
+    "in": [
+     {
+      "sigPresent": false,
+      "sigValid": false,
+      "anchorPresent": false,
+      "anchorValid": false,
+      "attPresent": false,
+      "attValid": false
+     }
+    ],
+    "out": {
+     "ok": true,
+     "level": 0,
+     "attestation": "none"
+    }
+   },
+   {
+    "in": [
+     {
+      "sigPresent": true,
+      "sigValid": true,
+      "anchorPresent": true,
+      "anchorValid": true,
+      "attPresent": false,
+      "attValid": true
+     }
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     {
+      "sigPresent": true,
+      "sigValid": "yes",
+      "anchorPresent": true,
+      "anchorValid": true,
+      "attPresent": true,
+      "attValid": true
+     }
+    ],
+    "out": {
+     "ok": false
+    }
+   }
+  ],
+  "groundedIn": "kcc-mint.md: 'A badge that cannot fail is not a badge' — the original defect decided the conformance level by whether the signature FIELD HELD ANYTHING (junk displayed LEVEL 4 with no cryptography performed), and Return 2 rendered `konomi_attestation ? 'attested' : 'none'` so a forged attestation showed green; the fix was a kernel attestationStatus with three states where PRESENT-BUT-INVALID is distinct from absent, and level derives only from verification results."
+ },
+ {
+  "fn": "guardBooking",
+  "teaches": "interval overlap double-booking guard",
+  "description": "guardBooking(existing, candidate) decides whether a candidate booking clashes with existing bookings for the same unit. existing is an array (possibly empty) of booking objects {id, unit, checkin, checkout, status}; candidate is an object {unit, checkin, checkout}. Validation (any failure returns EXACTLY {ok:false} and nothing else): existing must be an array; every existing booking must have id and unit as non-empty strings, status exactly the string 'confirmed' or exactly 'cancelled', and checkin/checkout as valid ISO 'YYYY-MM-DD' strings (regex ^\\d{4}-\\d{2}-\\d{2}$ AND a real Gregorian calendar date — 2026-02-30 is invalid; leap years honoured) with checkout strictly after checkin (lexicographic comparison of the ISO strings is sufficient); candidate must have unit as a non-empty string and checkin/checkout under the same date rules with checkout strictly after checkin. Semantics: a booking occupies the half-open night interval [checkin, checkout) — the checkout day itself is free, so an existing checkout equal to the candidate checkin is NOT a clash (back-to-back is allowed). An existing booking conflicts if and only if ALL of: its unit is exactly equal (===) to candidate.unit, its status is 'confirmed' (cancelled bookings never conflict), and the intervals overlap: existing.checkin < candidate.checkout AND candidate.checkin < existing.checkout (both strict lexicographic string comparisons). Overlap is a comparison of INTERVALS, never of start times: an existing booking fully containing, contained in, or partially overlapping the candidate all conflict. Success shape: {ok:true, clash:<boolean>, conflictIds:<array of the id strings of every conflicting existing booking, in the same order they appear in the existing array>}. clash is true if and only if conflictIds is non-empty. No mutation of inputs, no I/O, no clock.",
+  "inputs": [
+   "existing",
+   "candidate"
+  ],
+  "verify": [
+   {
+    "in": [
+     [
+      {
+       "id": "b1",
+       "unit": "lodge",
+       "checkin": "2026-08-12",
+       "checkout": "2026-08-14",
+       "status": "confirmed"
+      }
+     ],
+     {
+      "unit": "lodge",
+      "checkin": "2026-08-13",
+      "checkout": "2026-08-15"
+     }
+    ],
+    "out": {
+     "ok": true,
+     "clash": true,
+     "conflictIds": [
+      "b1"
+     ]
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "id": "b1",
+       "unit": "lodge",
+       "checkin": "2026-08-12",
+       "checkout": "2026-08-14",
+       "status": "confirmed"
+      }
+     ],
+     {
+      "unit": "lodge",
+      "checkin": "2026-08-14",
+      "checkout": "2026-08-16"
+     }
+    ],
+    "out": {
+     "ok": true,
+     "clash": false,
+     "conflictIds": []
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "id": "b1",
+       "unit": "lodge",
+       "checkin": "2026-08-12",
+       "checkout": "2026-08-14",
+       "status": "cancelled"
+      },
+      {
+       "id": "b2",
+       "unit": "pod",
+       "checkin": "2026-08-12",
+       "checkout": "2026-08-14",
+       "status": "confirmed"
+      }
+     ],
+     {
+      "unit": "lodge",
+      "checkin": "2026-08-12",
+      "checkout": "2026-08-14"
+     }
+    ],
+    "out": {
+     "ok": true,
+     "clash": false,
+     "conflictIds": []
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "id": "b1",
+       "unit": "lodge",
+       "checkin": "2026-08-10",
+       "checkout": "2026-08-13",
+       "status": "confirmed"
+      },
+      {
+       "id": "b2",
+       "unit": "lodge",
+       "checkin": "2026-08-14",
+       "checkout": "2026-08-16",
+       "status": "confirmed"
+      },
+      {
+       "id": "b3",
+       "unit": "lodge",
+       "checkin": "2026-08-20",
+       "checkout": "2026-08-22",
+       "status": "confirmed"
+      }
+     ],
+     {
+      "unit": "lodge",
+      "checkin": "2026-08-12",
+      "checkout": "2026-08-15"
+     }
+    ],
+    "out": {
+     "ok": true,
+     "clash": true,
+     "conflictIds": [
+      "b1",
+      "b2"
+     ]
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "id": "b1",
+       "unit": "lodge",
+       "checkin": "2026-08-12",
+       "checkout": "2026-08-14",
+       "status": "confirmed"
+      }
+     ],
+     {
+      "unit": "lodge",
+      "checkin": "2026-08-13",
+      "checkout": "2026-08-13"
+     }
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     null,
+     {
+      "unit": "lodge",
+      "checkin": "2026-08-13",
+      "checkout": "2026-08-15"
+     }
+    ],
+    "out": {
+     "ok": false
+    }
+   }
+  ],
+  "groundedIn": "sell-shelf.md: fallslot's remembered defect — confirmBooking pushed with no availability test, and the one check compared START TIMES exactly, so a 10:00 booking no longer blocked 10:30 ('Overlap is a comparison of intervals, not of start times'). glampos.md makes this same guard the product's closer (clash caught, back-to-back NOT a clash, cancelled no false clash), and wishwood-client-build.md ships it as mergeChannels cross-channel double-booking detection. This exam seals interval-overlap-with-half-open-checkout as the contract."
+ },
+ {
+  "fn": "splitDeposit",
+  "teaches": "exact pence deposit balance split",
+  "description": "splitDeposit(totalPence, depositPct, checkin, balanceDueDays) splits a booking price into a deposit and a balance in INTEGER PENCE and computes the balance due date. Validation (any failure returns EXACTLY {ok:false} and nothing else): totalPence must be an integer (Number.isInteger true — floats like 4500050.5 refused, numeric strings like '4500050' refused) and >= 0; depositPct must be an integer with 0 <= depositPct <= 100; checkin must be a valid ISO 'YYYY-MM-DD' string (regex ^\\d{4}-\\d{2}-\\d{2}$ AND a real Gregorian calendar date — 2026-02-30 refused; leap years honoured, so 2028-02-29 is valid); balanceDueDays must be an integer >= 0. Arithmetic, all in integers with no floating point drift: depositPence = round-half-up of (totalPence * depositPct / 100), computed exactly as Math.floor((totalPence * depositPct + 50) / 100) — a fractional part of exactly half a penny rounds UP. balancePence = totalPence - depositPence, so depositPence + balancePence === totalPence exactly, always. balanceDue = the ISO 'YYYY-MM-DD' date exactly balanceDueDays calendar days BEFORE checkin (balanceDueDays of 0 means balanceDue equals checkin), computed with real Gregorian month lengths and leap-year rules (a year divisible by 4 is a leap year unless divisible by 100, unless also divisible by 400), crossing month and year boundaries correctly, zero-padded to 4-2-2 digits. Success shape: {ok:true, depositPence:<integer>, balancePence:<integer>, balanceDue:'YYYY-MM-DD'}. Pure and deterministic: no clock, no locale, no Date-object timezone behaviour may leak into the result.",
+  "inputs": [
+   "totalPence",
+   "depositPct",
+   "checkin",
+   "balanceDueDays"
+  ],
+  "verify": [
+   {
+    "in": [
+     4500050,
+     30,
+     "2026-09-10",
+     14
+    ],
+    "out": {
+     "ok": true,
+     "depositPence": 1350015,
+     "balancePence": 3150035,
+     "balanceDue": "2026-08-27"
+    }
+   },
+   {
+    "in": [
+     150,
+     25,
+     "2028-03-01",
+     1
+    ],
+    "out": {
+     "ok": true,
+     "depositPence": 38,
+     "balancePence": 112,
+     "balanceDue": "2028-02-29"
+    }
+   },
+   {
+    "in": [
+     20000,
+     100,
+     "2026-08-20",
+     0
+    ],
+    "out": {
+     "ok": true,
+     "depositPence": 20000,
+     "balancePence": 0,
+     "balanceDue": "2026-08-20"
+    }
+   },
+   {
+    "in": [
+     101,
+     33,
+     "2027-01-05",
+     10
+    ],
+    "out": {
+     "ok": true,
+     "depositPence": 33,
+     "balancePence": 68,
+     "balanceDue": "2026-12-26"
+    }
+   },
+   {
+    "in": [
+     "4500050",
+     30,
+     "2026-09-10",
+     14
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     150,
+     25,
+     "2026-02-30",
+     1
+    ],
+    "out": {
+     "ok": false
+    }
+   }
+  ],
+  "groundedIn": "sell-shelf.md: fallforce's remembered money defects — parseInt('45000.50') is 45000 so 'fifty pence gone on every deal', string values turning + into concatenation (£63,000 displaying as £4,500,018,000), and nothing bounding a percentage. This exam seals the estate's integer-pence discipline for the bookings shelf's deposit/balance need (glampos.md / wishwood-client-build.md take direct Stripe bookings): integer-only inputs refused otherwise, a named round-half-up rule, the split summing exactly to its own total, and the due date computed not decorated."
+ },
+ {
+  "fn": "scorecardScore",
+  "teaches": "weighted score with coverage attached",
+  "description": "scorecardScore(dims) — dims is a non-empty array of dimension objects {name, weight, score}. name: a non-empty string, unique across the array (case-sensitive; any duplicate name is invalid). weight: an integer >= 1, interpreted as tenths (12 means 1.2) — non-integer, zero, or negative weights are invalid. score: either null, meaning the dimension was not asked, or an integer with 1 <= score <= 5 inclusive. A blank and a bad answer are different: any non-null score that is not an integer in [1,5] — a 9, a 2.5, the string 'good', NaN (which passes a typeof 'number' check but must still be refused: the finite-integer test stands on its own), or a missing field — makes the whole input invalid. Every invalid input returns EXACTLY {ok:false} with no other fields. If every dimension's score is null there is nothing to score: return {ok:false}. Otherwise return {ok:true, scoreHundredths, answered, total, partScored} where: total = dims.length; answered = the count of dimensions whose score is not null; partScored = (answered < total); scoreHundredths = the weighted mean of the ANSWERED dimensions only, as an integer number of hundredths: compute the exact rational (100 * sum(weight_i * score_i)) / sum(weight_i) over answered dimensions only, then round it to the nearest integer with ties (an exact .5 of a hundredth) rounded up. All arithmetic must be exact — no float drift may change the rounded result. Coverage always travels with the score: a single answered 5 returns scoreHundredths 500 WITH answered 1 and partScored true; it is never allowed to look like a fully assessed board.",
+  "inputs": [
+   "dims: array of {name:string, weight:integer tenths >=1, score: integer 1..5 or null}"
+  ],
+  "verify": [
+   {
+    "in": [
+     [
+      {
+       "name": "technical",
+       "weight": 12,
+       "score": 5
+      },
+      {
+       "name": "communication",
+       "weight": 10,
+       "score": null
+      },
+      {
+       "name": "ownership",
+       "weight": 10,
+       "score": null
+      },
+      {
+       "name": "curiosity",
+       "weight": 9,
+       "score": null
+      },
+      {
+       "name": "teamwork",
+       "weight": 10,
+       "score": null
+      },
+      {
+       "name": "delivery",
+       "weight": 10,
+       "score": null
+      },
+      {
+       "name": "leadership",
+       "weight": 10,
+       "score": null
+      }
+     ]
+    ],
+    "out": {
+     "ok": true,
+     "scoreHundredths": 500,
+     "answered": 1,
+     "total": 7,
+     "partScored": true
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "name": "technical",
+       "weight": 12,
+       "score": 4
+      },
+      {
+       "name": "communication",
+       "weight": 10,
+       "score": 4
+      },
+      {
+       "name": "ownership",
+       "weight": 10,
+       "score": 4
+      },
+      {
+       "name": "curiosity",
+       "weight": 9,
+       "score": 4
+      },
+      {
+       "name": "teamwork",
+       "weight": 10,
+       "score": 4
+      },
+      {
+       "name": "delivery",
+       "weight": 10,
+       "score": 4
+      },
+      {
+       "name": "leadership",
+       "weight": 10,
+       "score": 4
+      }
+     ]
+    ],
+    "out": {
+     "ok": true,
+     "scoreHundredths": 400,
+     "answered": 7,
+     "total": 7,
+     "partScored": false
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "name": "a",
+       "weight": 3,
+       "score": 3
+      },
+      {
+       "name": "b",
+       "weight": 5,
+       "score": 4
+      }
+     ]
+    ],
+    "out": {
+     "ok": true,
+     "scoreHundredths": 363,
+     "answered": 2,
+     "total": 2,
+     "partScored": false
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "name": "technical",
+       "weight": 12,
+       "score": 9
+      }
+     ]
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "name": "technical",
+       "weight": 12,
+       "score": "good"
+      }
+     ]
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "name": "technical",
+       "weight": 12,
+       "score": null
+      }
+     ]
+    ],
+    "out": {
+     "ok": false
+    }
+   }
+  ],
+  "groundedIn": "people-shelf.md — scorecardAvg skipped blank dimensions in the denominator too, so one answered 5 produced 5.00 identical to a thorough seven-dimension board and beat a full board of 4s; the fix is that coverage (answered/total/part-scored) travels with the score always, and a bad answer ('good', 9 of 5) is invalid, never 'not asked'. Also bakes in the shelf's own gate-found fault that NaN passes a typeof 'number' check, and its boundary-test lesson (the rounding boundary vector lands exactly on .5)."
+ },
+ {
+  "fn": "panelAgreement",
+  "teaches": "panel spread, never fake unanimity",
+  "description": "panelAgreement(scores) — scores is an array of overall scorecard scores in integer hundredths on the 1-to-5 scale: each element must be an integer with 100 <= s <= 500 inclusive. The finite-integer check must stand on its own: NaN and non-integer numbers like 250.5 are invalid even though typeof reports 'number'; strings, null, and booleans are invalid. If scores is not an array, is empty (zero raters means nothing was assessed), or any element fails the check, return EXACTLY {ok:false} with no other fields. Otherwise return {ok:true, raters, spread} where raters = the number of elements. spread is null when raters is exactly 1 — one opinion is never agreement, and a lone scorecard must NEVER report spread 0. When raters >= 2, spread = max(scores) - min(scores), an integer >= 0 in hundredths. Genuine unanimity among two or more raters legitimately returns spread 0; only the single-scorecard case returns null, so 0 always means a real panel that really agreed.",
+  "inputs": [
+   "scores: array of integer hundredths, each 100..500 inclusive"
+  ],
+  "verify": [
+   {
+    "in": [
+     [
+      420
+     ]
+    ],
+    "out": {
+     "ok": true,
+     "raters": 1,
+     "spread": null
+    }
+   },
+   {
+    "in": [
+     [
+      400,
+      400,
+      400
+     ]
+    ],
+    "out": {
+     "ok": true,
+     "raters": 3,
+     "spread": 0
+    }
+   },
+   {
+    "in": [
+     [
+      300,
+      300
+     ]
+    ],
+    "out": {
+     "ok": true,
+     "raters": 2,
+     "spread": 0
+    }
+   },
+   {
+    "in": [
+     [
+      220,
+      410,
+      350
+     ]
+    ],
+    "out": {
+     "ok": true,
+     "raters": 3,
+     "spread": 190
+    }
+   },
+   {
+    "in": [
+     [
+      250.5,
+      300
+     ]
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     [
+      "good"
+     ]
+    ],
+    "out": {
+     "ok": false
+    }
+   }
+  ],
+  "groundedIn": "people-shelf.md — the panel spread returned 0 for a single scorecard, so one opinion was reported as perfect agreement (and the card rendered nothing either way); the fix is that agreement is null for one scorecard, never 0, so a 0 can only mean a real panel in genuine agreement. The n=2 unanimous vector is the boundary between null and 0, and the 250.5 refusal seals the shelf's NaN/non-integer typeof trap."
+ },
+ {
+  "fn": "dsarDueDate",
+  "teaches": "ICO DSAR working-day due date",
+  "description": "dsarDueDate(received, months, holidays) computes the UK GDPR subject-access-request due date per ICO guidance. Inputs: received is an ISO date string 'YYYY-MM-DD' (zero-padded, calendar-valid on the Gregorian calendar — leap years are years divisible by 4, except century years, unless divisible by 400; a nonexistent date like '2026-04-31' is a typo, not a deadline, and MUST be refused, never rolled forward); months is exactly the integer 1 (statutory) or exactly the integer 3 (extended) — any other value, including 2, non-integers, or numeric strings, is refused; holidays is an array (possibly empty) of ISO date strings, each of which must itself be zero-padded and calendar-valid — a non-array, or any invalid entry, refuses the whole call; duplicate entries and holidays that fall on weekends are permitted and harmless. Step 1 (calendar-month add with short-month clamp): the provisional due date is the same day-of-month, `months` calendar months after received; if the target month has no such day, clamp to the LAST day of the target month (31 Jan 2026 + 1 month = 28 Feb 2026; in a leap year it clamps to 29 Feb). Step 2 (working-day roll): while the provisional date is a Saturday, a Sunday, or exactly equal (string match) to any entry in holidays, advance it by exactly one calendar day; the roll may chain across consecutive weekends and holidays. Weekday determination is the standard Gregorian mapping of the ISO date. Success returns exactly {ok:true, due:'YYYY-MM-DD'} with the final zero-padded date. EVERY invalid input returns exactly {ok:false} with no other fields.",
+  "inputs": [
+   "received: ISO 'YYYY-MM-DD' string",
+   "months: integer, exactly 1 or 3",
+   "holidays: array of ISO 'YYYY-MM-DD' strings"
+  ],
+  "verify": [
+   {
+    "in": [
+     "2026-02-07",
+     1,
+     []
+    ],
+    "out": {
+     "ok": true,
+     "due": "2026-03-09"
+    }
+   },
+   {
+    "in": [
+     "2026-01-31",
+     1,
+     []
+    ],
+    "out": {
+     "ok": true,
+     "due": "2026-03-02"
+    }
+   },
+   {
+    "in": [
+     "2026-04-01",
+     1,
+     [
+      "2026-05-01"
+     ]
+    ],
+    "out": {
+     "ok": true,
+     "due": "2026-05-04"
+    }
+   },
+   {
+    "in": [
+     "2026-01-15",
+     3,
+     []
+    ],
+    "out": {
+     "ok": true,
+     "due": "2026-04-15"
+    }
+   },
+   {
+    "in": [
+     "2026-04-31",
+     1,
+     []
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     "2026-02-07",
+     2,
+     []
+    ],
+    "out": {
+     "ok": false
+    }
+   }
+  ],
+  "groundedIn": "legal-shelf.md ⚑ THE RULE THAT WAS PRINTED AND NEVER COMPUTED: every falljustice DSAR answer carried the ICO next-working-day sentence but nothing computed it — a request received 7 Feb 2026 was due Saturday 7 Mar and the tracker called the controller OVERDUE two days early. Vector 2 is the exact remembered changed-expectation case (31 Jan clamp to Sat 28 Feb 2026 → Monday 2 Mar); vector 5 is the remembered '31 April used to roll into 1 May' typo defect; holidays-as-input is the shelf's remembered refusal (never guess bank holidays)."
+ },
+ {
+  "fn": "lbaResponseDeadline",
+  "teaches": "Count working days for LBA",
+  "description": "lbaResponseDeadline(sent, workingDays, holidays) computes the date a letter-before-action response falls due by counting WORKING days, closing the remembered gap where responseDays was plain calendar arithmetic. Inputs: sent is an ISO date string 'YYYY-MM-DD' (zero-padded, calendar-valid Gregorian — leap years divisible by 4, except centuries, unless divisible by 400; nonexistent dates like '2026-02-30' are refused); workingDays is an integer with workingDays >= 1 and workingDays <= 250, both bounds inclusive — 0, negatives, non-integers, and anything above 250 are refused; holidays is an array (possibly empty) of zero-padded calendar-valid ISO date strings — a non-array or any invalid entry refuses the whole call; duplicates and weekend holidays are permitted and harmless. Counting rule: start from the day AFTER sent (sent itself never counts, whatever weekday it is); advance one calendar day at a time; a day counts as one working day if and only if it is Monday through Friday AND is not an exact string match to any holidays entry; the deadline is the date on which the workingDays-th counted working day falls. Weekday determination is the standard Gregorian mapping of the ISO date; counting may cross month and year boundaries. Success returns exactly {ok:true, deadline:'YYYY-MM-DD'} zero-padded. EVERY invalid input returns exactly {ok:false} with no other fields.",
+  "inputs": [
+   "sent: ISO 'YYYY-MM-DD' string",
+   "workingDays: integer, 1 <= workingDays <= 250",
+   "holidays: array of ISO 'YYYY-MM-DD' strings"
+  ],
+  "verify": [
+   {
+    "in": [
+     "2026-08-03",
+     5,
+     []
+    ],
+    "out": {
+     "ok": true,
+     "deadline": "2026-08-10"
+    }
+   },
+   {
+    "in": [
+     "2026-08-27",
+     3,
+     [
+      "2026-08-31"
+     ]
+    ],
+    "out": {
+     "ok": true,
+     "deadline": "2026-09-02"
+    }
+   },
+   {
+    "in": [
+     "2026-08-01",
+     1,
+     []
+    ],
+    "out": {
+     "ok": true,
+     "deadline": "2026-08-03"
+    }
+   },
+   {
+    "in": [
+     "2026-12-23",
+     3,
+     [
+      "2026-12-25",
+      "2026-12-28"
+     ]
+    ],
+    "out": {
+     "ok": true,
+     "deadline": "2026-12-30"
+    }
+   },
+   {
+    "in": [
+     "2026-02-30",
+     5,
+     []
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     "2026-08-03",
+     0,
+     []
+    ],
+    "out": {
+     "ok": false
+    }
+   }
+  ],
+  "groundedIn": "legal-shelf.md STILL OPEN ON THIS SHELF: 'lba.mjs response periods are ungated — the letter-before-action deadline is responseDays arithmetic that never goes near the working-day rule either' (falljustice.md: lba.mjs assembleLBA is the Clause-40 engine surface). Same holiday-as-input refusal doctrine as the DSAR kernel: never guess bank holidays, the caller supplies them. Vector 3 is the boundary (sent on a Saturday — sent never counts and counting starts from the next day); vector 4 chains a Friday holiday, a weekend, and a Monday substitute holiday across a month boundary."
+ },
+ {
+  "fn": "invoiceTotals",
+  "teaches": "invoice column sums to itself",
+  "description": "invoiceTotals(lines, vatRateBp) totals an invoice so the printed column ALWAYS adds up to its own subtotal, and so rates finer than a penny are multiplied exactly before any rounding. INPUTS: lines is a NON-EMPTY array of objects {qty, unitPrice}; extra properties on a line object are ignored. qty must be a JS number that is a safe integer with qty >= 1. unitPrice must be a STRING (a JS number is invalid — floats are the defect this exam kills) matching exactly /^[0-9]+(\\.[0-9]{1,6})?$/ — pounds as an exact non-negative decimal, up to 6 fractional digits; commas, signs, whitespace, empty string, or a second dot are invalid. vatRateBp must be a safe integer with 0 <= vatRateBp <= 10000 (VAT rate in basis points; 2000 means 20%). ARITHMETIC (all integer, no floats anywhere): for a unitPrice string with d fractional digits (d=0 if no dot) let P be the integer value of the string with the dot removed; the exact line value in pence is (qty * P * 100) / 10^d. linePence[i] = that exact value rounded HALF-UP to an integer (a fractional part of exactly one half rounds up; all values are non-negative). Multiply exactly FIRST, round ONCE at the line — never round the rate to a penny before multiplying. subtotalPence = the sum of the ROUNDED linePence values (never the unrounded line values — the printed column must equal the printed subtotal). vatPence = (subtotalPence * vatRateBp) / 10000 rounded HALF-UP to an integer. totalPence = subtotalPence + vatPence. RETURN {ok:true, linePence, subtotalPence, vatPence, totalPence} where linePence is the array in input order and the other three are integers. If lines is not a non-empty array, any element is not an object, or any field fails the rules above, return EXACTLY {ok:false} with no other fields.",
+  "inputs": [
+   "lines: non-empty array of {qty: integer>=1, unitPrice: exact decimal string in pounds, <=6 dp}",
+   "vatRateBp: integer 0..10000, VAT rate in basis points"
+  ],
+  "verify": [
+   {
+    "in": [
+     [
+      {
+       "qty": 3,
+       "unitPrice": "0.335"
+      }
+     ],
+     0
+    ],
+    "out": {
+     "ok": true,
+     "linePence": [
+      101
+     ],
+     "subtotalPence": 101,
+     "vatPence": 0,
+     "totalPence": 101
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "qty": 1,
+       "unitPrice": "0.335"
+      },
+      {
+       "qty": 1,
+       "unitPrice": "0.335"
+      },
+      {
+       "qty": 1,
+       "unitPrice": "0.335"
+      }
+     ],
+     0
+    ],
+    "out": {
+     "ok": true,
+     "linePence": [
+      34,
+      34,
+      34
+     ],
+     "subtotalPence": 102,
+     "vatPence": 0,
+     "totalPence": 102
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "qty": 1,
+       "unitPrice": "0.005"
+      }
+     ],
+     2000
+    ],
+    "out": {
+     "ok": true,
+     "linePence": [
+      1
+     ],
+     "subtotalPence": 1,
+     "vatPence": 0,
+     "totalPence": 1
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "qty": 1,
+       "unitPrice": "0.03"
+      },
+      {
+       "qty": 2,
+       "unitPrice": "1.00"
+      }
+     ],
+     5000
+    ],
+    "out": {
+     "ok": true,
+     "linePence": [
+      3,
+      200
+     ],
+     "subtotalPence": 203,
+     "vatPence": 102,
+     "totalPence": 305
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "qty": 1,
+       "unitPrice": "1,000"
+      }
+     ],
+     0
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "qty": 1,
+       "unitPrice": 0.335
+      }
+     ],
+     0
+    ],
+    "out": {
+     "ok": false
+    }
+   }
+  ],
+  "groundedIn": "money-shelf.md — fallinvoice: each line was printed rounded to the penny while the subtotal summed the UNROUNDED values (three lines of 1 x 0.335 printed 0.34/0.34/0.34 over a subtotal of 1.01; the customer adds the column and gets 1.02), plus 'A RATE IS NOT MONEY' (rounding the rate before multiplying turns 3 x 0.335 into 1.02 when the answer is 1.01, and float 3*0.335 vs 0.335+0.335+0.335 land a penny apart), plus the fallledger comma defect (Number('1,000') silently became zero). Vector 1 kills round-the-rate-first, vector 2 kills sum-the-unrounded, vector 3 is the half-up boundary, vectors 5-6 kill comma-coercion and float inputs."
+ },
+ {
+  "fn": "trialBalance",
+  "teaches": "fx applied, nothing dropped silently",
+  "description": "trialBalance(lines, accounts, baseCurrency) computes a multi-currency trial balance where the exchange rate is APPLIED (never decoration) and no line can ever be dropped in silence. INPUTS: accounts is a non-empty array of distinct non-empty strings (any duplicate or non-string or empty string makes the whole input invalid). baseCurrency is a string of exactly 3 uppercase letters A-Z. lines is a NON-EMPTY array of objects {account, side, amountMinor, currency, fxPpm?}; extra properties are ignored. account must be a string that appears in accounts — a line posted to an unknown account is INVALID INPUT (return {ok:false}); it is never skipped, because totals that agree only because a line was dropped are the original defect. side must be exactly \"D\" or \"C\". amountMinor must be a safe integer >= 1 (zero and negatives are invalid — a negative debit is a credit in disguise and is refused). currency must be exactly 3 uppercase letters A-Z. fxPpm is the exchange rate to base in parts-per-million as a safe integer >= 1: it is REQUIRED when currency !== baseCurrency, and must be ABSENT (the property undefined or not present) when currency === baseCurrency — a foreign line with no stated rate is invalid, because 'the rate is one' and 'nobody said' differ by exactly the money that goes missing. CONVERSION (integer arithmetic, no floats): a base-currency line contributes amountMinor unchanged; a foreign line contributes (amountMinor * fxPpm) / 1000000 rounded HALF-UP to an integer (fractional part of exactly one half rounds up; all values non-negative). debitMinor = sum of contributions of all \"D\" lines; creditMinor = sum of contributions of all \"C\" lines. RETURN {ok:true, debitMinor, creditMinor, balanced} where balanced is the boolean debitMinor === creditMinor. An unbalanced journal is a VALID input reported with balanced:false — only malformed input returns EXACTLY {ok:false} with no other fields.",
+  "inputs": [
+   "lines: non-empty array of {account: string, side: \"D\"|\"C\", amountMinor: integer>=1, currency: 3 uppercase letters, fxPpm?: integer>=1 required iff currency !== baseCurrency}",
+   "accounts: non-empty array of distinct non-empty strings — the chart of accounts",
+   "baseCurrency: 3 uppercase letters"
+  ],
+  "verify": [
+   {
+    "in": [
+     [
+      {
+       "account": "cash",
+       "side": "D",
+       "amountMinor": 10000,
+       "currency": "GBP"
+      },
+      {
+       "account": "sales",
+       "side": "C",
+       "amountMinor": 10000,
+       "currency": "USD",
+       "fxPpm": 800000
+      }
+     ],
+     [
+      "cash",
+      "sales"
+     ],
+     "GBP"
+    ],
+    "out": {
+     "ok": true,
+     "debitMinor": 10000,
+     "creditMinor": 8000,
+     "balanced": false
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "account": "cash",
+       "side": "D",
+       "amountMinor": 10000,
+       "currency": "GBP"
+      },
+      {
+       "account": "sales",
+       "side": "C",
+       "amountMinor": 12500,
+       "currency": "USD",
+       "fxPpm": 800000
+      }
+     ],
+     [
+      "cash",
+      "sales"
+     ],
+     "GBP"
+    ],
+    "out": {
+     "ok": true,
+     "debitMinor": 10000,
+     "creditMinor": 10000,
+     "balanced": true
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "account": "cash",
+       "side": "D",
+       "amountMinor": 2,
+       "currency": "GBP"
+      },
+      {
+       "account": "sales",
+       "side": "C",
+       "amountMinor": 3,
+       "currency": "USD",
+       "fxPpm": 500000
+      }
+     ],
+     [
+      "cash",
+      "sales"
+     ],
+     "GBP"
+    ],
+    "out": {
+     "ok": true,
+     "debitMinor": 2,
+     "creditMinor": 2,
+     "balanced": true
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "account": "cash",
+       "side": "D",
+       "amountMinor": 100,
+       "currency": "GBP"
+      },
+      {
+       "account": "ghost",
+       "side": "C",
+       "amountMinor": 100,
+       "currency": "GBP"
+      }
+     ],
+     [
+      "cash",
+      "sales"
+     ],
+     "GBP"
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "account": "cash",
+       "side": "D",
+       "amountMinor": 100,
+       "currency": "GBP"
+      },
+      {
+       "account": "sales",
+       "side": "C",
+       "amountMinor": 100,
+       "currency": "USD"
+      }
+     ],
+     [
+      "cash",
+      "sales"
+     ],
+     "GBP"
+    ],
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "in": [
+     [
+      {
+       "account": "cash",
+       "side": "D",
+       "amountMinor": -100,
+       "currency": "GBP"
+      },
+      {
+       "account": "sales",
+       "side": "C",
+       "amountMinor": 100,
+       "currency": "GBP"
+      }
+     ],
+     [
+      "cash",
+      "sales"
+     ],
+     "GBP"
+    ],
+    "out": {
+     "ok": false
+    }
+   }
+  ],
+  "groundedIn": "money-shelf.md — fallledger's four remembered defects: the fxRate was written once and READ NOWHERE so a 100 GBP debit balanced a 100 USD credit forever (vector 1 makes the rate load-bearing); pounds summed as floats balanced to within half a penny (integer minor units + exact ppm conversion, vector 3 is the half-up boundary); the trial balance silently dropped lines posted to deleted accounts so totals stayed equal BECAUSE both sides were dropped — 'balanced means BOTH totals agree AND nothing is unplaced' (vector 4 refuses the unplaced line); a negative debit is a credit in disguise and is refused (vector 6); and 'a foreign line with no stated rate converts to nothing' becomes an outright refusal (vector 5)."
+ }
+]
