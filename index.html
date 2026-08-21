@@ -441,7 +441,7 @@ function tock() {
   if (paused) return;
   tick++;
   const h = 9 + Math.floor(tick / 8), m = (tick * 7.5) % 60;
-  $('clock').textContent = 'Day 1 · ' + String(Math.min(h, 17)).padStart(2, '0') + ':' + String(Math.floor(m)).padStart(2, '0');
+  $('clock').textContent = h >= 17 ? 'Day 1 · the evening shift' : 'Day 1 · ' + String(h).padStart(2, '0') + ':' + String(Math.floor(m)).padStart(2, '0');
   pick(EVENTS)();
   if (tick % 9 === 0) signOneDoor();
 }
