@@ -215,7 +215,7 @@
     }
    }
   ],
-  "groundedIn": "kcc-mint.md: 'A badge that cannot fail is not a badge' — the original defect decided the conformance level by whether the signature FIELD HELD ANYTHING (junk displayed LEVEL 4 with no cryptography performed), and Return 2 rendered `konomi_attestation ? 'attested' : 'none'` so a forged attestation showed green; the fix was a kernel attestationStatus with three states where PRESENT-BUT-INVALID is distinct from absent, and level derives only from verification results."
+  "groundedIn": "the mint spec: 'A badge that cannot fail is not a badge' — the original defect decided the conformance level by whether the signature FIELD HELD ANYTHING (junk displayed LEVEL 4 with no cryptography performed), and Return 2 rendered `konomi_attestation ? 'attested' : 'none'` so a forged attestation showed green; the fix was a kernel attestationStatus with three states where PRESENT-BUT-INVALID is distinct from absent, and level derives only from verification results."
  },
  {
   "fn": "guardBooking",
