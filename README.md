@@ -1,4 +1,4 @@
-# fallcorp-demo — Northgate Claims, a konomified company RUNNING
+# fallcorp-demo — Northgate Claims, an AI-first company RUNNING
 
 **LIVE: https://sjgant80-hub.github.io/fallcorp-demo/**
 
